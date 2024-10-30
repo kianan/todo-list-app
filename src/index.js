@@ -5,6 +5,9 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const { publishMessage } = require('./pubsub/publisher');
+const { listenForMessages } = require('./pubsub/consumer');
+
 // Middleware to parse JSON
 app.use(express.json());
 
@@ -17,6 +20,7 @@ app.use(express.json());
 const todoSchema = new mongoose.Schema({
   title: { type: String, required: true },
   completed: { type: Boolean, default: false },
+  duedate: { type: Date, required: true },
 });
 
 const Todo = mongoose.model('Todo', todoSchema);
@@ -24,9 +28,13 @@ const Todo = mongoose.model('Todo', todoSchema);
 // Create a new todo
 app.post('/todos', async (req, res) => {
   try {
-    const { title, completed } = req.body;
-    const newTodo = new Todo({ title, completed });
+    const { title, completed, duedate } = req.body;
+    const newTodo = new Todo({ title, completed, duedate });
     const savedTodo = await newTodo.save();
+
+    // Call the publishMessage function to publish the task data to Pub/Sub
+    await publishMessage(title, completed, duedate);
+
     res.status(201).json(savedTodo);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -59,10 +67,10 @@ app.get('/todos/:id', async (req, res) => {
 // Update a specific todo by ID
 app.put('/todos/:id', async (req, res) => {
   try {
-    const { title, completed } = req.body;
+    const { title, completed, duedate } = req.body;
     var updatedTodo = await Todo.findByIdAndUpdate(
       req.params.id,
-      { title, completed },
+      { title, completed, duedate },
       { new: true, runValidators: true }
     );
     if (!updatedTodo) {
@@ -90,4 +98,6 @@ app.delete('/todos/:id', async (req, res) => {
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
+  // Start listening for messages from Pub/Sub
+  listenForMessages();
 });
