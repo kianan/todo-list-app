@@ -9,6 +9,9 @@ const PORT = process.env.PORT || 3000;
 const { publishMessage } = require('./pubsub/publisher');
 const { listenForMessages } = require('./pubsub/consumer');
 
+const helmet = require('helmet');
+app.use(helmet());
+
 // Middleware to parse JSON
 app.use(express.json());
 
