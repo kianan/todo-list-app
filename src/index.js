@@ -8,6 +8,8 @@ const PORT = process.env.PORT || 3000;
 
 const { publishMessage } = require('./pubsub/publisher');
 const { listenForMessages } = require('./pubsub/consumer');
+const { body, validationResult } = require('express-validator');
+
 
 const helmet = require('helmet');
 app.use(helmet());
@@ -40,8 +42,25 @@ const todoSchema = new mongoose.Schema({
 const Todo = mongoose.model('Todo', todoSchema);
 
 // Create a new todo
-app.post('/todos', limiter, async (req, res) => {
+app.post('/todos', limiter,
+  // add express validator
+  [body('title')
+    .isString()
+    .notEmpty()
+    .withMessage('title is required'),
+  body('completed')
+    .isBoolean()
+    .withMessage('completed must be a boolean'),
+  body('duedate')
+    .isISO8601()
+    .withMessage('duedate must be a valid date'),],
+  async (req, res) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
     const { title, completed, duedate } = req.body;
     const newTodo = new Todo({ title, completed, duedate });
     const savedTodo = await newTodo.save();
